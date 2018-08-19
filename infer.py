@@ -32,7 +32,6 @@ def get_abcd_pads(x_half, mask):
     y = x_half
     x = mask
     
-    print(x.shape, y.shape)
     x = cv2.threshold(x, 0, 255, cv2.THRESH_OTSU+cv2.THRESH_BINARY_INV)[1]
     x = cv2.morphologyEx(x, cv2.MORPH_CLOSE, np.ones([1, 20]))
     x = cv2.morphologyEx(x, cv2.MORPH_OPEN, np.ones([1, 100]))
@@ -44,7 +43,6 @@ def get_abcd_pads(x_half, mask):
         return x*10+y
     results = {}
     cnts = sorted(cnts, key=score)
-    print(y.shape)
     for i, cnt in enumerate(cnts):
         x_,y_,w_,h_ = cv2.boundingRect(cnt)
         pad = y[y_:y_+h_, x_:x_+w_]
@@ -57,28 +55,30 @@ def get_abcd_pads(x_half, mask):
     return results
 
 
-def process_pdf(pdf):
-    print(pdf)
-    img = convert(pdf)
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    img = img[:img.shape[0]//2]/127.5-1
-    
-    img = cv2.resize(img, (1024, 512))
-    img = np.expand_dims(img, 0)
-    img = np.expand_dims(img, -1)
-    
-    img_out = sess.run(model['outputs'][0,...,0], {model['inputs']:img})*255
-    img_out = img_out.astype('uint8')
-    img_in = convert(pdf)
-    img_half = img_in[:img_in.shape[0]//2]
-    results = get_abcd_pads(img_half, img_out)
-    with open(pdf.replace('.pdf','.json'), 'w') as f:
-        json.dump(results, f)
-    print('INFO: dump at:', pdf.replace('.pdf', '.json'))
-    print(len(results))
-    print('-'*100)
+def process_pdf(input_path, output_path):
+	if '.pdf' in input_path:
+		img = convert(input_path)
+	else:
+		img = cv2.imread(input_path)
+	img_in = img.copy()	
+	img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+	img = img[:img.shape[0]//2]/127.5-1
+
+	img = cv2.resize(img, (1024, 512))
+	img = np.expand_dims(img, 0)
+	img = np.expand_dims(img, -1)
+
+	img_out = sess.run(model['outputs'][0,...,0], {model['inputs']:img})*255
+	img_out = img_out.astype('uint8')
+	img_half = img_in[:img_in.shape[0]//2]
+	results = get_abcd_pads(img_half, img_out)
+	with open(output_path,  'w') as f:
+		json.dump(results, f)
+	print('INFO: dump at:',output_path)
+	print(len(results))
+	print('-'*100)
 if __name__ == '__main__':
     for pdf_path in sorted(glob('data/*.pdf')):
-        process_pdf(pdf_path)
+        process_pdf(pdf_path, pdf_path.replace('.pdf','.json'))
 
 
